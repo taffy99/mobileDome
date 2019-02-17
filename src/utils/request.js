@@ -5,6 +5,7 @@ import { getToken } from '@/utils/token'
 //创建axios实例
 const service = axios.create({
     baseURL:process.env.BASE_API,//api的base_url
+    //baseURL:"https://172.16.1.53:443/ams-uic",
     timeout:10000 //请求超时时间
 });
 
@@ -14,8 +15,8 @@ service.interceptors.request.use(config =>{
         if (config.params === undefined) {
             config.params = {}
         } 
-        store.commit('showLoading')
-    } 
+        //store.commit('showLoading')
+    }
     if(store.getters.token){
         //为每次请求添加token
         if(config.method === 'get'){
@@ -37,10 +38,10 @@ service.interceptors.request.use(config =>{
 //response拦截器
 service.interceptors.response.use(response =>{
     if(response.data.code === '1'){
-        store.commit('hideLoading')
+        //store.commit('hideLoading')
         return response.data
     }else{
-        MessageBox.alert(res.data.message);
+        MessageBox.alert(response.data.message);
         store.commit('hideLoading')
         return Promise.reject('error');
     }

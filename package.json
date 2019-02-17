@@ -1,5 +1,5 @@
 {
-  "name": "a-vue-app-template",
+  "name": "pbs-ams-qtp-mobile",
   "version": "1.0.0",
   "description": "A Vue.js project",
   "author": "",
@@ -19,6 +19,7 @@
     "better-scroll": "^1.13.2",
     "echarts": "^3.8.5",
     "font-awesome": "^4.7.0",
+    "jquery": "^2.2.4",
     "js-cookie": "^2.2.0",
     "mint-ui": "^2.2.10",
     "net": "^1.0.2",

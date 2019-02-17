@@ -1,17 +1,15 @@
 <template>
-    <div class='key-container'>
-        <!-- <input class='input-box' @focus="isInput=true"  v-model="lots" @blur="closeKeyBoard">  -->
-        
-        <div  @click.stop='_handleKeyPress' v-show="isInput" :class='[isInput?fadeIn:fadeOut,keyboard]' :style="">
-            <div class="tips"> 
-               <span v-if="isPrice">最下变动价为0.2，涨停3455.2，跌停2827.2</span>
-               <span v-else>最大开仓手数：66</span>
-               <i class="iconfont icon-keyboardhide" @click="closeKeyBoard"></i>
+    <div class='key-container' @click.stop='_handleKeyPress'>
+        <div v-if="isInput" :class='[isInput?fadeIn:fadeOut,keyboard]'>
+            <div class="tips">
+               <span v-if="isPrice">最小变动价为{{priceTick}}，涨停{{upperLimitPrice}}，跌停{{lowerLimitPrice}}</span>
+               <span v-else-if="isLots">最大开仓手数：{{maxOpenLots}}</span>
+               <i class="iconfont icon-keyboardhide" data-num="O"></i>
             </div>
             <ul v-show="isPrice" class="priceTab">
-                <li>对手价</li>
-                <li>市价</li>
-                <li>最新价</li>
+                <li data-num="opponent">对手价</li>
+                <li data-num="market">市价</li>
+                <li data-num="new">最新价</li>
             </ul>
             <div class='key-row'>
                 <div class='key-cell' data-num='1'>1</div>
@@ -40,7 +38,6 @@
             </div>
             <div class='key-add' data-num='A'><span class="mark" data-num='A'>+</span></div>
             <div class='key-minus' data-num='M'><span class="mark" data-num='M'>－</span></div>
-            <!-- <div class='key-confirm' data-num='S'>确认</div> -->
         </div>
     </div>
 </template>
@@ -49,25 +46,32 @@
     export default{
         props:[
             'isInput',
-            'isPrice'
+            'isPrice',
+            'isLots',
+            'maxOpenLots', //最大开仓手数
+            'priceTick', //最小变动价
+            'maketPrice',//市价
+            'opponentPrice',//对手价
+            'upperLimitPrice',//涨停价
+            'lowerLimitPrice'//跌停价
         ],
         mounted(){
         },
     	data(){
     		return{
-                inputNum:"1",
+                inputNum:"0",//手数
                 fadeIn: 'fadeIn',
                 fadeOut:'fadeOut',
                 keyboard:'keyboard'
             }
         },
         methods : {
-            closeKeyBoard(){
-                this.$emit('closeKeyBoard',this.inputNum)
+            _closeKeyBoard(){
+                this.$emit('closeKeyBoard')
             },
 			//处理按键
 			_handleKeyPress(e) {
-				let num = e.target.dataset.num;
+                let num = e.target.dataset.num;
                 let S = this.inputNum
 				//不同按键处理逻辑
 				// -1 代表无效按键，直接返回
@@ -84,7 +88,7 @@
                     //加号
                     case 'A':
                         S = this._handleAddKey();
-                        break; 
+                        break;
                     //减号
                     case "M":
                         S = this._handleMinusKey();
@@ -94,9 +98,22 @@
 						S = this._handleClearKey();
 						break;
 					//确认键
-					case 'S': 
+					case 'S':
 						S = this._handleConfirmKey();
-						break;
+                        break;
+                    //关闭键盘
+                    case 'O':
+                        this._closeKeyBoard();
+                        break;
+                    case 'opponent': //对手价
+                        S = this._handleOpponentkey();
+                        break;
+                    case 'market'://市价
+                        S = this._handleMarketKey();
+                        break;
+                    case 'new'://最新价
+                        S = this._handleNewKey();
+                        break;
                     default:
 						S = this._handleNumberKey(num);
 						break;
@@ -133,11 +150,11 @@
 			_handleNumberKey(num) {
                 if(num===undefined){
                     num="";
-                }
-				let S = this.inputNum.toString();
+                } 
+				let S = this.inputNum.toString().replace(/[^0-9]+/g,"");
 				//如果有小数点且小数点位数不小于2
 				if ( S.indexOf('.') > -1 && S.substring(S.indexOf('.') + 1).length < 2)
-					return this.inputNum = S + num; 
+					return this.inputNum = S + num;
 
 				//没有小数点
 				if (!(S.indexOf('.') > -1)) {
@@ -149,9 +166,8 @@
 						if (S.length && Number(S.charAt(0)) === 0) return this.inputNum = num;
 						return this.inputNum = S + num;
 					}
-
 				}
-                
+
             },
             //加号
             _handleAddKey() {
@@ -169,7 +185,19 @@
                 }else{
                     return this.inputNum=S-1;
                 }
-                
+
+            },
+            //对手价
+            _handleOpponentkey(){
+                return this.inputNum="对手价";
+            },
+            //市价
+            _handleMarketKey(){
+                return this.inputNum = "市价";
+            },
+            //最新价
+            _handleNewKey(){
+                return this.inputNum = "最新价";
             },
 			//提交
 			_handleConfirmKey() {
@@ -196,7 +224,7 @@
         margin:0.5em;
         display: flex;
         justify-content: space-between;
-        align-items: center; 
+        align-items: center;
     }
     .tips span{
         color:#007aff;
@@ -284,7 +312,7 @@
         -webkit-transform: scaleY(0.5);
         transform: scaleY(0.5);
     }
-    
+
     .keyboard .key-cell {
         flex: 1;
         -webkit-box-flex: 1;
@@ -368,7 +396,7 @@
         width:95%;
         height:2.5em;
         line-height: 2.5em;
-        
+
     }
     .priceTab li{
             width:33%;

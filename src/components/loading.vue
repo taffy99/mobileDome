@@ -1,5 +1,5 @@
 <template>
-    <section>
+    <section class="loadContent">
         <div class='mock'>
             <div class='main'>
                 <mt-spinner type="triple-bounce"></mt-spinner>
@@ -15,7 +15,7 @@ export default {
 </script>
    
 <style>
-    section{
+    .loadContent{
         width:100vh;
         height:100vh;
         position:relative;

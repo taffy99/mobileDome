@@ -1,16 +1,15 @@
 <template>
     <!-- <div class="page has-navbar" v-nav="{ title: '策略交易监控' }">  -->
-      
-      <div class="page">
+      <div class="page" v-show="!isWxConnect">
           <div class="login-form">
-              <h1>策略交易监控</h1>
+              <h1>睿歆量化策略平台</h1>
               <div class="form-cotent">
-                      <div class="form-cotent-item" @click="actionSheet">
+                      <!-- <div class="form-cotent-item" @click="actionSheet">
                           <label v-for="(item,index) in addressList" :key="index">
                               {{item.isSelect?item.name:""}}
                           </label>
                           <i class="iconfont icon-arrow-right alRight"></i>
-                      </div>
+                      </div> -->
                       <div class="form-cotent-item">
                           <i class="iconfont icon-user"></i>
                           <input type="text" v-model="userName" id="txtUserId" placeholder="请输入您的用户名" @focus="isBlur1= true" @blur="checkName">
@@ -21,7 +20,7 @@
                           <input type="password" v-model="passWord" id="txtPassword" placeholder="请输入您的密码" @focus="isBlur2= true" @blur="checkPassword">
                           <i class="iconfont icon-close alRight" v-show="isBlur2"  @click="clearTxt(1)"></i>
                       </div>
-                      <div class="wthree-text">
+                      <!-- <div class="wthree-text">
                           <ul>
                               <li>
                                   <input type="checkbox" id="brand" checked="checked">
@@ -30,13 +29,14 @@
                               <li><a href="#">忘记密码?</a> </li>
                           </ul>
                           <div class="clear"> </div>
-                      </div>
-                      <button class="loginBtn" @click="btn_login()" :class="{active:isActive}"  :disabled="isabled">
+                      </div> -->
+                      <!-- <button class="loginBtn" @click="btn_login()" :class="{active:isActive}"  :disabled="isabled"> -->
+                      <button class="loginBtn active" @click="btn_login()">
                        登录
                       </button>
-                      <div class="changeBtn">
+                      <!-- <div class="changeBtn">
                           <span>更换登录方式</span>
-                      </div>
+                      </div> -->
                 </div>
         </div> 
         <mt-actionsheet
@@ -49,18 +49,22 @@
 <script>
   import axios from "axios";
   import { MessageBox } from "mint-ui";
-  import { login, getInstitution } from "@/api/base";
+  import { login, getInstitution, userComfirm, getUserWx, loginByUserId, addUserWx} from "@/api/base";
   import { setToken } from "@/utils/token";
   import { setUserId } from "@/utils/user";
+  
   export default {
     data(){
       return {
+        isWxConnect:false,//关联微信
         address:"公网 （139.129.96.68）",//地址
         userName:"", //用户名
         passWord:"", //密码 
         institutionId:"",//机构代码
         institutionName:"",//机构名称
         institution:[], //机构列表
+        openId:"",//微信认证ID
+        wxImgUrl:"",//微信认证头像
         addressList:
         [
             {
@@ -87,6 +91,94 @@
       }
     },
     created(){
+      let url = window.location.href;
+      if(url.indexOf("?")!=-1){ //参数传入
+          let openidStr = url.split("?")[1].split("&")[0].split("=")[1];
+          let wxImgUrlStr = url.split("?")[1].split("&")[1].split("=")[1].replace("th//://","")
+          this.openId = openidStr;
+          this.wxImgUrl = wxImgUrlStr;
+          console.log("微信认证 openId："+this.openId+"\n imgurl："+this.wxImgUrl);
+          //按照openid查询UIC当前的用户列表 ：读取openid和userId 的关系表
+          getUserWx({
+              wxOpenId:this.openId
+          }).then((res)=>{
+              if(res.data != null){ //查询到用户
+                //获取用户的用户名/密码并登陆
+                let userId = res.data.userId;
+                this.isWxConnect = true;
+                this.$store.commit('showLoading');
+                loginByUserId({
+                    userId:userId
+                }).then((res)=>{
+                    console.log(res.data);
+                    const token = res.data.token; //获取token值
+                    const userId = res.data.userId;//获取用户代码
+                    const userName = res.data.name; //获取用户名称
+                    const password = res.data.password;//密码
+                    const loginId = res.data.loginId;//登录名
+                    const institutionId = res.data.institutionId;//机构ID
+                    const mobile = res.data.mobile;//手机号码
+                    const avatar = res.data.avatar;//头像
+                    
+                    setToken(token);//将token存入cookie中
+                    setUserId(userId);//将userId存入cookie中
+                    this.$store.commit('SET_TOKEN',token) //将token存入Vuex中
+                    this.$store.commit('setUserId',userId) //将userId存入Vuex中
+                    sessionStorage.setItem('loginId',loginId);
+                    sessionStorage.setItem('password',password)
+                    sessionStorage.setItem('userName',userName);
+                    sessionStorage.setItem('mobile',mobile);
+                    sessionStorage.setItem('avatar',avatar);
+                    this.webSocketApi.initWebSocket(token);
+
+                    userComfirm({ //用户认证
+                            loginId:loginId,
+                            password:password,
+                            institutionId:institutionId
+                    }).then((res)=>{ 
+                            let resData = res.data;
+                            sessionStorage.setItem('amounts',resData.amounts);//资金规模
+                            sessionStorage.setItem('userState',resData.status==0?"无效":"有效");//客户状态
+                            sessionStorage.setItem('end_datetime',resData.end_datetime);//有效日期
+                    });
+                    getInstitution({  //机构查询
+                            userId:userId
+                        }).then((res)=>{
+                            let resData = res.data;
+                            this.institutionName = resData.name;
+                            this.institutionId = resData.institutionId;
+                            sessionStorage.setItem('institutionName',this.institutionName);
+                            //跳转首页
+                            setTimeout(() => { 
+                                this.$store.commit('hideLoading');
+                                this.$router.push({ 
+                                    path:'/my'
+                                }) 
+                            }, 500);
+                        }); 
+                        //查询所有的合约信息
+                        let content =  {
+                            "functionId":"50000104",
+                            "requestId":"123",
+                            "req_ans":"req",
+                        };
+                        let message ={
+                        serviceCode: "10000702" , 
+                        content : JSON.stringify(content)
+                        };
+                        this.webSocketApi.sendSock(message); 
+
+                        //获取期货合约信息
+                        let self = this;
+                        window.setTimeout(()=>{
+                            let futureInfo = JSON.stringify(self.webSocketApi.futureInfo);
+                            sessionStorage.setItem('futureInfo',futureInfo)//将合约信息存入sessionStorage中 
+                        },3000)
+                })
+              }
+          })
+      }
+
       let _footer = this.$store.state.footerVisible; 
       if (_footer) {
         this.$store.commit('TOGGLE_FOOTER');
@@ -138,18 +230,6 @@
                 this.isActive = false;
             }
         },
-        getInstitutionList(){
-            if(this.userName!=undefined && this.userName.trim()!==""){
-                getInstitution({
-                    loginId:this.userName
-                }).then((res)=>{
-                    let resData = res.data;
-                    this.institutionName = resData.name;
-                    this.institutionId = resData.institutionId;
-                    console.log(res.data)
-            });
-           }
-        },
        btn_login(){
            if(this.userName.trim() == ""){
                  MessageBox.alert('用户名不能为空');
@@ -159,26 +239,84 @@
                MessageBox.alert('密码不能为空');
                return;
            };
-           this.$router.push({
-                    path:'/my'
-                })
-           //登录接口(已封装@/api/base.js)
-        //    login({ 
-        //        loginId:this.userName,
-        //        password:this.passWord
-        //    }).then((res)=>{
-        //        console.log(res.data); 
-        //        const token = res.data.token; //获取token值
-        //        const userId = res.data.loginId;//获取用户代码
-        //        setToken(token);//将token存入cookie中
-        //        setUserId(userId);//将userId存入cookie中
-        //        this.$store.commit('SET_TOKEN',token) //将token存入Vuex中
-        //        this.$store.commit('setUserId',userId) //将userId存入Vuex中
-        //        this.webSocketApi.subscribeSingle(this.$store.state.userId);
-        //        this.$router.push({
-        //             path:'/my'
-        //         })
-        //    })
+           this.$store.commit('showLoading');
+           login({ 
+               loginId:this.userName,
+               password:this.passWord
+           }).then((res)=>{
+               console.log(res.data); 
+              
+               const token = res.data.token; //获取token值
+               const userId = res.data.userId;//获取用户代码
+               const userName = res.data.name; //获取用户名称
+               const password = res.data.password;//密码
+               const loginId = res.data.loginId;//登录名
+               const institutionId = res.data.institutionId;//机构ID
+               const mobile = res.data.mobile;//手机号码
+               const avatar = res.data.avatar;//头像
+               setToken(token);//将token存入cookie中
+               setUserId(userId);//将userId存入cookie中
+               this.$store.commit('SET_TOKEN',token) //将token存入Vuex中
+               this.$store.commit('setUserId',userId) //将userId存入Vuex中
+               sessionStorage.setItem('loginId',loginId);
+               sessionStorage.setItem('password',password)
+               sessionStorage.setItem('userName',userName);
+               sessionStorage.setItem('mobile',mobile);
+               sessionStorage.setItem('avatar',avatar);
+               this.webSocketApi.initWebSocket(token);
+               if(this.openId){//微信认证ID存在
+                    addUserWx({
+                        userId:userId,
+                        wxOpenId:this.openId,
+                        wxImgUrl:this.wxImgUrl
+                    }).then((res)=>{
+
+                    })
+               }
+               userComfirm({ //用户认证
+                    loginId:loginId,
+                    password:password,
+                    institutionId:institutionId
+               }).then((res)=>{ 
+                    let resData = res.data;
+                    sessionStorage.setItem('amounts',resData.amounts);//资金规模
+                    sessionStorage.setItem('userState',resData.status==0?"无效":"有效");//客户状态
+                    sessionStorage.setItem('end_datetime',resData.end_datetime);//有效日期
+               });
+               getInstitution({  //机构查询
+                    userId:userId
+                }).then((res)=>{
+                    let resData = res.data;
+                    this.institutionName = resData.name;
+                    this.institutionId = resData.institutionId;
+                    sessionStorage.setItem('institutionName',this.institutionName);
+                    //跳转首页
+                    setTimeout(() => {
+                        this.$store.commit('hideLoading');
+                        this.$router.push({ 
+                            path:'/my'
+                        }) 
+                    }, 500);
+                }); 
+                //查询所有的合约信息
+                let content =  {
+                    "functionId":"50000104",
+                    "requestId":"123",
+                    "req_ans":"req",
+                };
+                let message ={
+                serviceCode: "10000702" , 
+                content : JSON.stringify(content)
+                };
+                this.webSocketApi.sendSock(message); 
+
+                //获取期货合约信息
+                let self = this;
+                window.setTimeout(()=>{
+                    let futureInfo = JSON.stringify(self.webSocketApi.futureInfo);
+                    sessionStorage.setItem('futureInfo',futureInfo)//将合约信息存入sessionStorage中
+                },3000)
+           })
        }
     }
     
@@ -192,7 +330,7 @@
     bottom:0;
     width: 100%;
     height: 100%;
-    background:url('images/bg.png') no-repeat;
+    background:url('images/bg.jpg') no-repeat;
     background-size: cover;
 }
     

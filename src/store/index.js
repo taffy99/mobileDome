@@ -4,10 +4,8 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import * as types from './mutation-types'
-import { getToken } from '@/utils/token'
+import { getToken, getFutureToken,removeFutureToken} from '@/utils/token'
 import { getUserId } from '@/utils/user'
-
-
 Vue.use(Vuex);
 
 const store = new Vuex.Store({
@@ -15,8 +13,9 @@ const store = new Vuex.Store({
     footerVisible: true,
     selectedTab: 'my',
     chartType:'客户分类结构',
-    token:getToken(),
-    userId:getUserId(),
+    token:getToken(), //uic-token
+    futureToken:getFutureToken(), //future-token
+    userId:getUserId(),//uic-userId
     LOADING:false
   },
   mutations: {
@@ -31,6 +30,13 @@ const store = new Vuex.Store({
     },
     SET_TOKEN(state,token){ //存储token
       state.token = token
+    },
+    SET_FUTURETOKEN(state,futureToken){ //存储期货futureToken
+      state.futureToken = futureToken
+    },
+    
+    DELETE_FUTURETOKEN(){ //存储期货futureToken
+      removeFutureToken()
     },
     setUserId(state,userId){
       state.userId = userId
